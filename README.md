@@ -87,4 +87,4 @@ a different frontend, etc.).
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+Apache-2.0 license — see [LICENSE](./LICENSE).
