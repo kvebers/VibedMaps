@@ -31,7 +31,13 @@ is static and runs client-side.
 ## Bringing your own API key
 
 Pick a provider in the UI (Anthropic, OpenAI, or Gemini), paste an API key
-you've created with that provider, and click **Generate**. The key:
+you've created with that provider, and click **Generate**.
+
+**Easiest way to get started: Gemini.** Google's AI Studio (https://aistudio.google.com/apikey)
+issues API keys with a free tier, no payment method required, so it's the
+fastest way to try the app before deciding whether to use a paid provider.
+
+The key:
 
 - is kept only in React state and (optionally) `localStorage` in your own
   browser, per provider

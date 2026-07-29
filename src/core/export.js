@@ -3,41 +3,199 @@
 // outside the UI.
 
 import { parseMapData } from './schema.js'
+import { getLegendStops } from './render.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const AI_CAPTION_TEXT = 'AI-generated, not real data'
+const TEXT_COLOR = '#08060d'
+const MUTED_COLOR = '#6b6375'
+const PADDING = 16
+const TITLE_SIZE = 18
+const UNIT_SIZE = 12
+const EXPLANATION_SIZE = 11
+const LEGEND_LABEL_SIZE = 10
+const LINE_GAP = 1.4
+
+function formatLegendValue(v) {
+  if (Math.abs(v) >= 1000) return v.toFixed(0)
+  if (Math.abs(v) >= 10) return v.toFixed(1)
+  return v.toFixed(2)
+}
+
+function measureText(ctx, text, font) {
+  ctx.font = font
+  return ctx.measureText(text).width
+}
+
+/** Greedy word-wrap using an actual canvas font measurement, so exported text wraps like the live UI. */
+function wrapText(ctx, text, font, maxWidth) {
+  const words = text.split(/\s+/).filter(Boolean)
+  const lines = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (current && measureText(ctx, candidate, font) > maxWidth) {
+      lines.push(current)
+      current = word
+    } else {
+      current = candidate
+    }
+  }
+  if (current) lines.push(current)
+  return lines
+}
+
+function textEl(x, y, text, { size = 12, weight = 'normal', italic = false, fill = TEXT_COLOR, anchor = 'start' } = {}) {
+  const el = document.createElementNS(SVG_NS, 'text')
+  el.setAttribute('x', String(x))
+  el.setAttribute('y', String(y))
+  el.setAttribute('font-size', String(size))
+  el.setAttribute('font-family', 'sans-serif')
+  el.setAttribute('font-weight', weight)
+  if (italic) el.setAttribute('font-style', 'italic')
+  el.setAttribute('fill', fill)
+  el.setAttribute('text-anchor', anchor)
+  el.textContent = text
+  return el
+}
+
+function rectEl(x, y, w, h, fill) {
+  const el = document.createElementNS(SVG_NS, 'rect')
+  el.setAttribute('x', String(x))
+  el.setAttribute('y', String(y))
+  el.setAttribute('width', String(w))
+  el.setAttribute('height', String(h))
+  el.setAttribute('fill', fill)
+  return el
+}
 
 /**
- * Serializes an SVG element to a standalone XML string. Bakes in the
- * "AI-generated, not real data" caption (shown separately in the live UI, but
- * otherwise lost once the SVG/PNG leaves the app) so exported files always
- * carry the disclaimer.
+ * Composes a standalone, exportable SVG: the rendered map plus everything
+ * that's shown alongside it in the live UI but otherwise lives in plain HTML
+ * (title, unit, explanation, legend, "AI-generated" caption) — all of which
+ * would otherwise be lost the moment the SVG/PNG leaves the app.
+ * @param {SVGSVGElement} svgEl the live, rendered map <svg>
+ * @param {import('./schema').MapData} mapData
+ * @param {{ schemeId?: string, binned?: boolean }} [options]
+ * @returns {SVGSVGElement} a new, detached <svg> ready to serialize
+ */
+export function buildExportSvg(svgEl, mapData, options = {}) {
+  const { schemeId, binned = false } = options
+  const mapWidth = Number(svgEl.getAttribute('width')) || svgEl.clientWidth || 800
+  const mapHeight = Number(svgEl.getAttribute('height')) || svgEl.clientHeight || 500
+  const contentWidth = mapWidth - PADDING * 2
+
+  const measureCanvas = document.createElement('canvas')
+  const mctx = measureCanvas.getContext('2d')
+
+  const titleLines = mapData?.title ? wrapText(mctx, mapData.title, `600 ${TITLE_SIZE}px sans-serif`, contentWidth) : []
+  const explanationLines = mapData?.explanation
+    ? wrapText(mctx, mapData.explanation, `${EXPLANATION_SIZE}px sans-serif`, contentWidth)
+    : []
+
+  let legendStops = []
+  if (mapData) {
+    try {
+      legendStops = getLegendStops(mapData, { schemeId, binned, bins: 6, steps: 6 })
+    } catch {
+      legendStops = []
+    }
+  }
+
+  const headerHeight =
+    PADDING +
+    titleLines.length * TITLE_SIZE * LINE_GAP +
+    (mapData?.unit ? UNIT_SIZE * LINE_GAP : 0) +
+    (explanationLines.length ? explanationLines.length * EXPLANATION_SIZE * LINE_GAP + 6 : 0) +
+    PADDING * 0.5
+  const legendHeight = legendStops.length ? 16 + LEGEND_LABEL_SIZE * LINE_GAP + PADDING * 1.5 : PADDING
+  const totalWidth = mapWidth
+  const totalHeight = headerHeight + mapHeight + legendHeight
+
+  const svg = document.createElementNS(SVG_NS, 'svg')
+  svg.setAttribute('xmlns', SVG_NS)
+  svg.setAttribute('width', String(totalWidth))
+  svg.setAttribute('height', String(totalHeight))
+  svg.setAttribute('viewBox', `0 0 ${totalWidth} ${totalHeight}`)
+  svg.appendChild(rectEl(0, 0, totalWidth, totalHeight, '#ffffff'))
+
+  // Header: title, unit, explanation
+  let cy = PADDING + TITLE_SIZE
+  for (const line of titleLines) {
+    svg.appendChild(textEl(PADDING, cy, line, { size: TITLE_SIZE, weight: '600' }))
+    cy += TITLE_SIZE * LINE_GAP
+  }
+  if (mapData?.unit) {
+    svg.appendChild(textEl(PADDING, cy, mapData.unit, { size: UNIT_SIZE, fill: MUTED_COLOR }))
+    cy += UNIT_SIZE * LINE_GAP
+  }
+  if (explanationLines.length) {
+    cy += 6
+    for (const line of explanationLines) {
+      svg.appendChild(textEl(PADDING, cy, line, { size: EXPLANATION_SIZE, fill: MUTED_COLOR }))
+      cy += EXPLANATION_SIZE * LINE_GAP
+    }
+  }
+
+  // Map content, moved into a translated group so it sits below the header.
+  const mapGroup = document.createElementNS(SVG_NS, 'g')
+  mapGroup.setAttribute('transform', `translate(0, ${headerHeight})`)
+  const mapClone = svgEl.cloneNode(true)
+  while (mapClone.firstChild) mapGroup.appendChild(mapClone.firstChild)
+  svg.appendChild(mapGroup)
+
+  // Legend
+  if (legendStops.length) {
+    const ly = headerHeight + mapHeight + PADDING * 0.75
+    if (binned) {
+      let lx = PADDING
+      const font = `${LEGEND_LABEL_SIZE}px sans-serif`
+      for (const stop of legendStops) {
+        svg.appendChild(rectEl(lx, ly, 12, 12, stop.color))
+        const label = `${formatLegendValue(stop.value)}–${formatLegendValue(stop.upper)}`
+        svg.appendChild(textEl(lx + 16, ly + 10, label, { size: LEGEND_LABEL_SIZE, fill: MUTED_COLOR }))
+        lx += 16 + measureText(mctx, label, font) + 16
+      }
+    } else {
+      const rampWidth = Math.min(220, contentWidth)
+      const stepW = rampWidth / legendStops.length
+      legendStops.forEach((stop, i) => {
+        svg.appendChild(rectEl(PADDING + i * stepW, ly, stepW, 12, stop.color))
+      })
+      svg.appendChild(textEl(PADDING, ly + 12 + LEGEND_LABEL_SIZE, formatLegendValue(legendStops[0].value), {
+        size: LEGEND_LABEL_SIZE,
+        fill: MUTED_COLOR,
+      }))
+      svg.appendChild(
+        textEl(PADDING + rampWidth, ly + 12 + LEGEND_LABEL_SIZE, formatLegendValue(legendStops[legendStops.length - 1].value), {
+          size: LEGEND_LABEL_SIZE,
+          fill: MUTED_COLOR,
+          anchor: 'end',
+        }),
+      )
+    }
+  }
+
+  // "AI-generated, not real data" caption, bottom-right corner.
+  svg.appendChild(
+    textEl(totalWidth - PADDING * 0.5, totalHeight - PADDING * 0.4, AI_CAPTION_TEXT, {
+      size: 11,
+      italic: true,
+      fill: MUTED_COLOR,
+      anchor: 'end',
+    }),
+  )
+
+  return svg
+}
+
+/**
+ * Serializes an SVG element to a standalone XML string.
  * @param {SVGSVGElement} svgEl
  * @returns {string}
  */
 export function svgToString(svgEl) {
-  const clone = svgEl.cloneNode(true)
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  const width = Number(clone.getAttribute('width')) || svgEl.clientWidth || 800
-  const height = Number(clone.getAttribute('height')) || svgEl.clientHeight || 500
-  if (!clone.getAttribute('width')) clone.setAttribute('width', String(width))
-  if (!clone.getAttribute('height')) clone.setAttribute('height', String(height))
-
-  const caption = document.createElementNS(SVG_NS, 'text')
-  caption.setAttribute('x', String(width - 6))
-  caption.setAttribute('y', String(height - 6))
-  caption.setAttribute('text-anchor', 'end')
-  caption.setAttribute('font-size', '11')
-  caption.setAttribute('font-style', 'italic')
-  caption.setAttribute('font-family', 'sans-serif')
-  caption.setAttribute('fill', '#6b6375')
-  caption.setAttribute('paint-order', 'stroke')
-  caption.setAttribute('stroke', '#ffffff')
-  caption.setAttribute('stroke-width', '3')
-  caption.textContent = AI_CAPTION_TEXT
-  clone.appendChild(caption)
-
-  return new XMLSerializer().serializeToString(clone)
+  return new XMLSerializer().serializeToString(svgEl)
 }
 
 /**
@@ -59,26 +217,31 @@ function downloadBlob(filename, content, mimeType) {
 }
 
 /**
- * Downloads the SVG element as a .svg file.
- * @param {SVGSVGElement} svgEl
+ * Downloads the map (plus title/unit/explanation/legend/caption) as a .svg file.
+ * @param {SVGSVGElement} svgEl the live, rendered map <svg>
+ * @param {import('./schema').MapData} mapData
+ * @param {{ schemeId?: string, binned?: boolean }} [options]
  * @param {string} [filename]
  */
-export function exportSvg(svgEl, filename = 'map.svg') {
-  const svgString = svgToString(svgEl)
-  downloadBlob(filename, svgString, 'image/svg+xml')
+export function exportSvg(svgEl, mapData, options = {}, filename = 'map.svg') {
+  const exportSvgEl = buildExportSvg(svgEl, mapData, options)
+  downloadBlob(filename, svgToString(exportSvgEl), 'image/svg+xml')
 }
 
 /**
- * Rasterizes the SVG element to a PNG and downloads it.
- * @param {SVGSVGElement} svgEl
+ * Rasterizes the map (plus title/unit/explanation/legend/caption) to a PNG and downloads it.
+ * @param {SVGSVGElement} svgEl the live, rendered map <svg>
+ * @param {import('./schema').MapData} mapData
+ * @param {{ schemeId?: string, binned?: boolean }} [options]
  * @param {string} [filename]
  * @param {number} [scale] device-pixel-ratio-style upscale for a crisper export
  * @returns {Promise<void>}
  */
-export function exportPng(svgEl, filename = 'map.png', scale = 2) {
-  const svgString = svgToString(svgEl)
-  const width = Number(svgEl.getAttribute('width')) || svgEl.clientWidth || 800
-  const height = Number(svgEl.getAttribute('height')) || svgEl.clientHeight || 500
+export function exportPng(svgEl, mapData, options = {}, filename = 'map.png', scale = 2) {
+  const exportSvgEl = buildExportSvg(svgEl, mapData, options)
+  const svgString = svgToString(exportSvgEl)
+  const width = Number(exportSvgEl.getAttribute('width'))
+  const height = Number(exportSvgEl.getAttribute('height'))
 
   return new Promise((resolve, reject) => {
     const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })

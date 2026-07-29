@@ -133,11 +133,13 @@ export default function App() {
   }
 
   function handleExportSvg() {
-    if (svgRef.current) exportSvg(svgRef.current, `${slugify(mapData?.title)}.svg`)
+    if (!svgRef.current) return
+    exportSvg(svgRef.current, displayedMapData, { schemeId, binned }, `${slugify(displayedMapData?.title)}.svg`)
   }
 
   async function handleExportPng() {
-    if (svgRef.current) await exportPng(svgRef.current, `${slugify(mapData?.title)}.png`)
+    if (!svgRef.current) return
+    await exportPng(svgRef.current, displayedMapData, { schemeId, binned }, `${slugify(displayedMapData?.title)}.png`)
   }
 
   function handleExportJson() {
