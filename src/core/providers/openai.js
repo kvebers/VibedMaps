@@ -5,12 +5,16 @@ import { parseMapData } from '../schema.js'
 const DEFAULT_MODEL = 'gpt-4o'
 
 // JSON Schema mirroring core/schema.js's zod shape, for Structured Outputs.
+// OpenAI's `strict: true` mode requires every property to be listed in
+// `required` — there's no true "optional" key, so `reasoning` is modeled as
+// nullable instead (the model returns null rather than omitting it).
 const MAP_DATA_JSON_SCHEMA = {
   type: 'object',
   properties: {
     title: { type: 'string' },
     unit: { type: 'string' },
     scale: { type: 'string', enum: ['sequential', 'diverging'] },
+    explanation: { type: 'string' },
     data: {
       type: 'array',
       items: {
@@ -18,13 +22,14 @@ const MAP_DATA_JSON_SCHEMA = {
         properties: {
           iso3: { type: 'string', pattern: '^[A-Z]{3}$' },
           value: { type: 'number' },
+          reasoning: { type: ['string', 'null'] },
         },
-        required: ['iso3', 'value'],
+        required: ['iso3', 'value', 'reasoning'],
         additionalProperties: false,
       },
     },
   },
-  required: ['title', 'unit', 'scale', 'data'],
+  required: ['title', 'unit', 'scale', 'explanation', 'data'],
   additionalProperties: false,
 }
 
@@ -39,12 +44,12 @@ export function createOpenAIProvider(config) {
   })
 
   return {
-    async generate(question, region) {
+    async generate(question, region, options = {}) {
       const completion = await client.chat.completions.create({
         model: config.model || DEFAULT_MODEL,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: buildUserPrompt(question, region) },
+          { role: 'user', content: buildUserPrompt(question, region, options) },
         ],
         response_format: {
           type: 'json_schema',

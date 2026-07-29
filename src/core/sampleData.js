@@ -6,6 +6,10 @@ export const sampleMapData = {
   title: 'Potato consumption per capita (sample data)',
   unit: 'kg/year',
   scale: 'sequential',
+  explanation:
+    'This is hardcoded sample data (not AI-generated) shown so the map renders before you ask a question. ' +
+    'Roughly, colder Northern/Eastern European countries lean higher (potatoes are a staple crop and diet ' +
+    'component there), while warmer, rice- or bread-staple regions lean lower.',
   data: [
     { iso3: 'BLR', value: 178 },
     { iso3: 'POL', value: 118 },

@@ -7,11 +7,20 @@ export const mapDataSchema = z.object({
   title: z.string().min(1).max(200),
   unit: z.string().min(1).max(60),
   scale: z.enum(['sequential', 'diverging']),
+  // What the index measures and how it was reasoned about in general — always
+  // required, independent of the per-country `reasoning` field below (which is
+  // optional and only populated when the user opts into the pricier
+  // per-country reasoning mode).
+  explanation: z.string().min(1).max(2000),
   data: z
     .array(
       z.object({
         iso3: z.string().regex(iso3Pattern, 'must be an ISO 3166-1 alpha-3 code, e.g. "USA"'),
         value: z.number().finite(),
+        // Nullish (not just optional): providers using strict JSON-schema
+        // structured outputs (e.g. OpenAI) require every property to be
+        // present and represent "omitted" as an explicit null.
+        reasoning: z.string().min(1).max(500).nullish(),
       }),
     )
     .min(1)

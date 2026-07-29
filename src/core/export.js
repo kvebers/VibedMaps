@@ -4,16 +4,39 @@
 
 import { parseMapData } from './schema.js'
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const AI_CAPTION_TEXT = 'AI-generated, not real data'
+
 /**
- * Serializes an SVG element to a standalone XML string.
+ * Serializes an SVG element to a standalone XML string. Bakes in the
+ * "AI-generated, not real data" caption (shown separately in the live UI, but
+ * otherwise lost once the SVG/PNG leaves the app) so exported files always
+ * carry the disclaimer.
  * @param {SVGSVGElement} svgEl
  * @returns {string}
  */
 export function svgToString(svgEl) {
   const clone = svgEl.cloneNode(true)
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  if (!clone.getAttribute('width')) clone.setAttribute('width', svgEl.clientWidth || 800)
-  if (!clone.getAttribute('height')) clone.setAttribute('height', svgEl.clientHeight || 500)
+  const width = Number(clone.getAttribute('width')) || svgEl.clientWidth || 800
+  const height = Number(clone.getAttribute('height')) || svgEl.clientHeight || 500
+  if (!clone.getAttribute('width')) clone.setAttribute('width', String(width))
+  if (!clone.getAttribute('height')) clone.setAttribute('height', String(height))
+
+  const caption = document.createElementNS(SVG_NS, 'text')
+  caption.setAttribute('x', String(width - 6))
+  caption.setAttribute('y', String(height - 6))
+  caption.setAttribute('text-anchor', 'end')
+  caption.setAttribute('font-size', '11')
+  caption.setAttribute('font-style', 'italic')
+  caption.setAttribute('font-family', 'sans-serif')
+  caption.setAttribute('fill', '#6b6375')
+  caption.setAttribute('paint-order', 'stroke')
+  caption.setAttribute('stroke', '#ffffff')
+  caption.setAttribute('stroke-width', '3')
+  caption.textContent = AI_CAPTION_TEXT
+  clone.appendChild(caption)
+
   return new XMLSerializer().serializeToString(clone)
 }
 

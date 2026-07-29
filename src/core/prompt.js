@@ -13,17 +13,27 @@ Rules:
 balance, temperature anomaly), otherwise "sequential" (e.g. consumption per capita, population, price).
 - "unit" is a short label for the legend (e.g. "kg/year", "%", "USD").
 - "title" is a short, human-readable title for the map.
+- "explanation" is REQUIRED on every response: 2-4 sentences explaining what this index measures and, \
+in general terms, how you reasoned about assigning values (what factors you weighted, what kind of \
+estimate this is). This is a general methodology note, not per-country — always include it.
 - Return only the requested structured data — no commentary, no markdown, no extra fields.`
+
+const REASONING_ON = `- For EVERY country, also include a "reasoning" field: one short sentence explaining \
+specifically why that country got that particular value relative to others.`
+
+const REASONING_OFF = `- Do not include a "reasoning" field on individual countries — omit it entirely to keep the response short.`
 
 /**
  * @param {string} question
  * @param {{ id: string, label: string, iso3: string[] | null } | null} [region]
+ * @param {{ includeReasoning?: boolean }} [options]
  * @returns {string} the user-turn prompt text
  */
-export function buildUserPrompt(question, region) {
+export function buildUserPrompt(question, region, options = {}) {
   const scopeLine =
     region && region.iso3
       ? `Only include these ${region.label} countries (ISO 3166-1 alpha-3 codes), and only ones from this list: ${region.iso3.join(', ')}.`
       : 'Generate map data answering this question for as many countries as plausible.'
-  return `Question: ${question.trim()}\n\n${scopeLine}`
+  const reasoningLine = options.includeReasoning ? REASONING_ON : REASONING_OFF
+  return `Question: ${question.trim()}\n\n${scopeLine}\n${reasoningLine}`
 }

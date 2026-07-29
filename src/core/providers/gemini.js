@@ -5,12 +5,15 @@ import { parseMapData } from '../schema.js'
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite'
 
 // JSON Schema mirroring core/schema.js's zod shape, for response_format.schema.
+// `reasoning` is nullable-and-required rather than simply optional, matching
+// the pattern strict structured-output modes need (see openai.js).
 const MAP_DATA_JSON_SCHEMA = {
   type: 'object',
   properties: {
     title: { type: 'string' },
     unit: { type: 'string' },
     scale: { type: 'string', enum: ['sequential', 'diverging'] },
+    explanation: { type: 'string' },
     data: {
       type: 'array',
       items: {
@@ -18,13 +21,14 @@ const MAP_DATA_JSON_SCHEMA = {
         properties: {
           iso3: { type: 'string', pattern: '^[A-Z]{3}$' },
           value: { type: 'number' },
+          reasoning: { type: ['string', 'null'] },
         },
-        required: ['iso3', 'value'],
+        required: ['iso3', 'value', 'reasoning'],
         additionalProperties: false,
       },
     },
   },
-  required: ['title', 'unit', 'scale', 'data'],
+  required: ['title', 'unit', 'scale', 'explanation', 'data'],
   additionalProperties: false,
 }
 
@@ -36,10 +40,10 @@ export function createGeminiProvider(config) {
   const client = new GoogleGenAI({ apiKey: config.apiKey })
 
   return {
-    async generate(question, region) {
+    async generate(question, region, options = {}) {
       const interaction = await client.interactions.create({
         model: config.model || DEFAULT_MODEL,
-        input: `${SYSTEM_PROMPT}\n\n${buildUserPrompt(question, region)}`,
+        input: `${SYSTEM_PROMPT}\n\n${buildUserPrompt(question, region, options)}`,
         response_format: {
           type: 'text',
           mime_type: 'application/json',

@@ -44,7 +44,7 @@ function chunkRegion(region) {
  * large regions (World, Europe, Africa) where a single prompt tends to
  * undercount.
  *
- * @param {{ providerId: 'anthropic' | 'openai' | 'gemini', apiKey: string, model?: string, question: string, regionId?: string, mode?: 'quick' | 'thorough', onProgress?: (done: number, total: number) => void }} args
+ * @param {{ providerId: 'anthropic' | 'openai' | 'gemini', apiKey: string, model?: string, question: string, regionId?: string, mode?: 'quick' | 'thorough', includeReasoning?: boolean, onProgress?: (done: number, total: number) => void }} args
  * @returns {Promise<import('./schema').MapData>}
  */
 export async function generateMapData({
@@ -54,6 +54,7 @@ export async function generateMapData({
   question,
   regionId,
   mode = 'quick',
+  includeReasoning = false,
   onProgress,
 }) {
   if (!apiKey?.trim()) {
@@ -69,9 +70,10 @@ export async function generateMapData({
   const provider = factory({ apiKey: apiKey.trim(), model: model?.trim() })
   const region = REGIONS[regionId] || REGIONS.world
   const trimmedQuestion = question.trim()
+  const options = { includeReasoning }
 
   if (mode !== 'thorough') {
-    return provider.generate(trimmedQuestion, region)
+    return provider.generate(trimmedQuestion, region, options)
   }
 
   const batches = chunkRegion(region)
@@ -80,7 +82,7 @@ export async function generateMapData({
 
   for (let i = 0; i < batches.length; i++) {
     onProgress?.(i, batches.length)
-    const batchResult = await provider.generate(trimmedQuestion, batches[i])
+    const batchResult = await provider.generate(trimmedQuestion, batches[i], options)
     if (!result) {
       result = batchResult
       seen.clear()

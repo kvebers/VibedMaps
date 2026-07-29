@@ -103,41 +103,49 @@ select {
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 8px;
+  padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--panel-bg);
 }
 
 .controls-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
 }
 
 .field {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 13px;
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
   color: var(--text);
-  min-width: 160px;
+  white-space: nowrap;
 }
 
 .field-grow {
   flex: 1;
-  min-width: 220px;
+  min-width: 160px;
 }
 
 .field input,
 .field select {
-  padding: 8px 10px;
+  padding: 4px 7px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--bg);
   color: var(--text-h);
-  font-size: 14px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.field-grow input,
+.field-grow select {
+  flex: 1;
 }
 
 .field input:focus,
@@ -153,15 +161,15 @@ select {
 .checkbox-field {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
+  gap: 5px;
+  font-size: 12px;
   color: var(--text-h);
   cursor: pointer;
 }
 
 .checkbox-field input {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
 }
 
 .controls-spacer {
@@ -169,18 +177,19 @@ select {
 }
 
 .progress-indicator {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--accent);
   font-weight: 500;
 }
 
 .controls-actions button {
-  padding: 9px 16px;
-  border-radius: 8px;
+  padding: 5px 11px;
+  border-radius: 6px;
   border: 1px solid var(--accent-border);
   background: var(--accent);
   color: white;
   font-weight: 500;
+  font-size: 13px;
   cursor: pointer;
 }
 
@@ -210,6 +219,15 @@ select {
   }
 }
 
+.notice-banner {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-size: 14px;
+}
+
 /* Map view */
 
 .map-view {
@@ -231,6 +249,14 @@ select {
   font-size: 13px;
   color: var(--text);
   margin-top: 2px;
+}
+
+.map-explanation {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 8px;
+  max-width: 70ch;
+  line-height: 1.5;
 }
 
 .map-canvas {
@@ -329,4 +355,144 @@ select {
 
 .legend-swatch-nodata {
   background: #e2e2e2;
+}
+
+/* Map interaction */
+
+.map-canvas {
+  position: relative;
+}
+
+.map-canvas svg {
+  cursor: grab;
+}
+
+.map-canvas svg:active {
+  cursor: grabbing;
+}
+
+.map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 10;
+  background: var(--text-h);
+  color: var(--bg);
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 6px 9px;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  max-width: 220px;
+}
+
+.map-tooltip-reasoning {
+  opacity: 0.85;
+  font-size: 11px;
+}
+
+.field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.field-inline select {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 13px;
+}
+
+.compare-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Ranked list / data table companion views */
+
+.ranked-list {
+  list-style: none;
+  margin: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.ranked-list-row {
+  font-size: 13px;
+}
+
+.ranked-list-main {
+  display: grid;
+  grid-template-columns: 140px 1fr 90px;
+  align-items: center;
+  gap: 10px;
+}
+
+.ranked-list-reasoning {
+  margin: 3px 0 0 150px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.ranked-list-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-h);
+}
+
+.ranked-list-bar-track {
+  height: 10px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ranked-list-bar {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+}
+
+.ranked-list-value {
+  text-align: right;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 13px;
+  background: var(--panel-bg);
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  color: var(--text);
+  font-weight: 600;
+  background: var(--code-bg);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
 }
