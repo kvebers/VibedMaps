@@ -217,7 +217,10 @@ export function renderChoropleth(
 
     const name = f.properties?.name ?? ''
     const reasoning = reasoningByNumeric.get(f.id)
-    appendTitle(path, tooltipText(name, value, mapData.unit, reasoning))
+    // Only give no-data countries a native tooltip: countries with data get an
+    // interactive hit area with a custom React tooltip in MapView, and adding
+    // a <title> on top of that made hover show both at once.
+    if (value === undefined) appendTitle(path, tooltipText(name, value, mapData.unit, reasoning))
     g.appendChild(path)
 
     if (value !== undefined) {
@@ -296,7 +299,6 @@ export function renderBubble(
 
     const name = f.properties?.name ?? ''
     const reasoning = reasoningByNumeric.get(f.id)
-    appendTitle(circle, tooltipText(name, value, mapData.unit, reasoning))
     g.appendChild(circle)
 
     if (showValues) appendValueLabel(labelsG, cx, cy, formatLabelValue(value))
@@ -363,7 +365,6 @@ export function renderCartogram(
 
     const name = node.f.properties?.name ?? ''
     const reasoning = reasoningByNumeric.get(node.f.id)
-    appendTitle(circle, tooltipText(name, node.value, mapData.unit, reasoning))
     g.appendChild(circle)
 
     if (showValues) appendValueLabel(labelsG, node.x, node.y, formatLabelValue(node.value))
@@ -446,7 +447,6 @@ export function renderHexbin(
 
     const name = p.f.properties?.name ?? ''
     const reasoning = reasoningByNumeric.get(p.f.id)
-    appendTitle(polygon, tooltipText(name, p.value, mapData.unit, reasoning))
     g.appendChild(polygon)
 
     // Screen-space (post-transform) center, for tooltips/labels/hit testing.
