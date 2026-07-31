@@ -4,8 +4,14 @@ import { forceSimulation, forceX, forceY, forceCollide } from 'd3-force'
 import { feature } from 'topojson-client'
 import { ISO3_TO_NUMERIC } from './isoNumeric.js'
 import { REGIONS } from './regions.js'
-import { getInterpolator } from './colorSchemes.js'
+import { getInterpolator, getCategoricalColors } from './colorSchemes.js'
 import { hexCorners, resolveHexPositions } from './hexgrid.js'
+import { clusterSimilarValues } from './textSimilarity.js'
+
+/** Magnitude used for symbol sizing — categorical (string) values all size the same. */
+function magnitudeOf(value) {
+  return typeof value === 'number' ? Math.abs(value) : 1
+}
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 export const NO_DATA_COLOR = '#e2e2e2'
@@ -76,11 +82,30 @@ function buildGeoContext({ worldTopology, regionId, width, height }) {
  * Picks a color scale from d3-scale-chromatic based on mapData.scale.
  * @param {import('./schema').MapData} mapData
  * @param {{ schemeId?: string, binned?: boolean, bins?: number }} [options]
- * @returns {{ scale: (v: number) => string, domain: [number, number], type: 'sequential' | 'diverging' }}
+ * @returns {{ scale: (v: number | string) => string, domain: [number, number] | string[], type: 'sequential' | 'diverging' | 'categorical', clusters?: Array<{ key: string, label: string, members: string[] }> }}
  */
 export function getColorScale(mapData, options = {}) {
   const { schemeId, binned = false, bins = 6 } = options
   const values = mapData.data.map((d) => d.value)
+
+  if (mapData.scale === 'categorical') {
+    // Group spelling variants of the same answer (e.g. "hei" vs "hej") so
+    // they land in the same color category, then cycle through the fixed
+    // palette by index — a world map can easily produce more distinct
+    // clusters (30+) than any palette has visually distinct colors (~10),
+    // so reuse across unrelated clusters is expected, not a bug.
+    const uniqueValues = [...new Set(values.map(String))]
+    const clusters = clusterSimilarValues(uniqueValues)
+    const palette = getCategoricalColors(schemeId)
+    const colorByKey = new Map(clusters.map((c, i) => [c.key, palette[i % palette.length]]))
+    const keyByValue = new Map()
+    for (const cluster of clusters) {
+      for (const member of cluster.members) keyByValue.set(member, cluster.key)
+    }
+    const scale = (v) => colorByKey.get(keyByValue.get(String(v))) ?? palette[0]
+    return { scale, domain: clusters.map((c) => c.label), type: 'categorical', clusters }
+  }
+
   const min = Math.min(...values)
   const max = Math.max(...values)
   const interpolator = getInterpolator(mapData.scale, schemeId)
@@ -156,7 +181,15 @@ function appendTitle(el, text) {
   el.appendChild(title)
 }
 
-function appendValueLabel(g, x, y, text) {
+/**
+ * Appends a value label positioned at (x, y). `box` is the label's country/
+ * symbol's on-screen footprint *before* any zoom transform — stashed as data
+ * attributes (plus the "value-label" class) so the live zoom handler in
+ * MapView can re-evaluate fit as the user zooms in, instead of the fit
+ * decision being frozen at whatever zoom level the map happened to render at.
+ */
+function appendValueLabel(g, x, y, text, box = {}) {
+  const { boxW = Infinity, boxH = Infinity } = box
   const el = document.createElementNS(SVG_NS, 'text')
   el.setAttribute('x', String(x))
   el.setAttribute('y', String(y))
@@ -166,15 +199,35 @@ function appendValueLabel(g, x, y, text) {
   el.setAttribute('paint-order', 'stroke')
   el.setAttribute('stroke', '#ffffff')
   el.setAttribute('stroke-width', '3')
+  el.setAttribute('class', 'value-label')
+  el.dataset.boxW = String(boxW)
+  el.dataset.boxH = String(boxH)
+  if (!labelFits(text, boxW, boxH)) el.style.display = 'none'
   el.textContent = text
   g.appendChild(el)
   return el
 }
 
 function formatLabelValue(value) {
+  if (typeof value !== 'number') return String(value)
   if (Math.abs(value) >= 100) return value.toFixed(0)
   if (Math.abs(value) >= 10) return value.toFixed(1)
   return value.toFixed(2)
+}
+
+/**
+ * Whether a label roughly fits within a country/symbol's on-screen box —
+ * used both at initial render (skip labels that would overflow a tiny
+ * country at the current zoom level) and live, by MapView's zoom handler,
+ * to reveal labels for countries that only become big enough once zoomed in.
+ * @param {string} text
+ * @param {number} boxW
+ * @param {number} boxH
+ * @param {number} [fontSize]
+ */
+export function labelFits(text, boxW, boxH, fontSize = 9) {
+  const estimatedWidth = text.length * fontSize * 0.6
+  return boxW >= estimatedWidth && boxH >= fontSize * 1.4
 }
 
 function tooltipText(name, value, unit, reasoning) {
@@ -226,7 +279,13 @@ export function renderChoropleth(
     if (value !== undefined) {
       const [cx, cy] = pathGenerator.centroid(f)
       if (Number.isFinite(cx) && Number.isFinite(cy)) {
-        if (showValues) appendValueLabel(labelsG, cx, cy, formatLabelValue(value))
+        if (showValues) {
+          const label = formatLabelValue(value)
+          const bounds = pathGenerator.bounds(f)
+          const boxW = bounds[1][0] - bounds[0][0]
+          const boxH = bounds[1][1] - bounds[0][1]
+          appendValueLabel(labelsG, cx, cy, label, { boxW, boxH })
+        }
         hitAreas.push({ iso3: iso3ByNumeric.get(f.id), name, value, reasoning, element: path, cx, cy })
       }
     }
@@ -274,7 +333,7 @@ export function renderBubble(
 
   const { valueByNumeric, iso3ByNumeric, reasoningByNumeric } = buildDataMaps(mapData)
   const colorScale = getColorScale(mapData, { schemeId, binned, bins })
-  const maxAbs = Math.max(...mapData.data.map((d) => Math.abs(d.value)), 1)
+  const maxAbs = Math.max(...mapData.data.map((d) => magnitudeOf(d.value)), 1)
   const rScale = scaleSqrt().domain([0, maxAbs]).range([2, Math.min(width, height) * 0.06])
 
   const g = document.createElementNS(SVG_NS, 'g')
@@ -288,10 +347,11 @@ export function renderBubble(
     const [cx, cy] = pathGenerator.centroid(f)
     if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue
 
+    const r = rScale(magnitudeOf(value))
     const circle = document.createElementNS(SVG_NS, 'circle')
     circle.setAttribute('cx', String(cx))
     circle.setAttribute('cy', String(cy))
-    circle.setAttribute('r', String(rScale(Math.abs(value))))
+    circle.setAttribute('r', String(r))
     circle.setAttribute('fill', colorScale.scale(value))
     circle.setAttribute('fill-opacity', '0.8')
     circle.setAttribute('stroke', colorScale.scale(value))
@@ -301,7 +361,10 @@ export function renderBubble(
     const reasoning = reasoningByNumeric.get(f.id)
     g.appendChild(circle)
 
-    if (showValues) appendValueLabel(labelsG, cx, cy, formatLabelValue(value))
+    if (showValues) {
+      const label = formatLabelValue(value)
+      appendValueLabel(labelsG, cx, cy, label, { boxW: r * 1.6, boxH: r * 1.6 })
+    }
     hitAreas.push({ iso3: iso3ByNumeric.get(f.id), name, value, reasoning, element: circle, cx, cy })
   }
   svgEl.appendChild(g)
@@ -329,7 +392,7 @@ export function renderCartogram(
 
   const { valueByNumeric, iso3ByNumeric, reasoningByNumeric } = buildDataMaps(mapData)
   const colorScale = getColorScale(mapData, { schemeId, binned, bins })
-  const maxAbs = Math.max(...mapData.data.map((d) => Math.abs(d.value)), 1)
+  const maxAbs = Math.max(...mapData.data.map((d) => magnitudeOf(d.value)), 1)
   const rScale = scaleSqrt().domain([0, maxAbs]).range([3, Math.min(width, height) * 0.07])
 
   const nodes = []
@@ -338,7 +401,7 @@ export function renderCartogram(
     if (value === undefined) continue
     const [x, y] = pathGenerator.centroid(f)
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue
-    nodes.push({ f, value, x, y, ox: x, oy: y, r: rScale(Math.abs(value)) })
+    nodes.push({ f, value, x, y, ox: x, oy: y, r: rScale(magnitudeOf(value)) })
   }
 
   const simulation = forceSimulation(nodes)
@@ -367,7 +430,10 @@ export function renderCartogram(
     const reasoning = reasoningByNumeric.get(node.f.id)
     g.appendChild(circle)
 
-    if (showValues) appendValueLabel(labelsG, node.x, node.y, formatLabelValue(node.value))
+    if (showValues) {
+      const label = formatLabelValue(node.value)
+      appendValueLabel(labelsG, node.x, node.y, label, { boxW: node.r * 1.6, boxH: node.r * 1.6 })
+    }
     hitAreas.push({
       iso3: iso3ByNumeric.get(node.f.id),
       name,
@@ -452,7 +518,11 @@ export function renderHexbin(
     // Screen-space (post-transform) center, for tooltips/labels/hit testing.
     const screenCx = p.px * fitScale + tx
     const screenCy = p.py * fitScale + ty
-    if (showValues) appendValueLabel(labelsG, screenCx, screenCy, formatLabelValue(p.value))
+    if (showValues) {
+      const label = formatLabelValue(p.value)
+      const hexScreenSize = hexSize * fitScale
+      appendValueLabel(labelsG, screenCx, screenCy, label, { boxW: hexScreenSize * 1.5, boxH: hexScreenSize * 1.5 })
+    }
     hitAreas.push({
       iso3: iso3ByNumeric.get(p.f.id),
       name,
@@ -496,6 +566,20 @@ export function renderMap(svgEl, { displayMode = 'choropleth', ...options }) {
  */
 export function getLegendStops(mapData, options = {}) {
   const { schemeId, binned = false, bins = 6, steps = 6 } = options
+
+  if (mapData.scale === 'categorical') {
+    const { scale, clusters } = getColorScale(mapData, { schemeId })
+    // A world map can turn up 30+ distinct clusters — showing all of them
+    // makes the legend unreadable, so only the most common ones get their
+    // own swatch and the long tail is lumped into one "+N more" entry.
+    const maxStops = 8
+    const byFrequency = [...clusters].sort((a, b) => b.members.length - a.members.length)
+    const shown = byFrequency.slice(0, maxStops)
+    const stops = shown.map((c) => ({ value: c.label, color: scale(c.members[0]) }))
+    const remaining = byFrequency.length - shown.length
+    if (remaining > 0) stops.push({ value: `+${remaining} more`, color: null })
+    return stops
+  }
 
   if (binned) {
     const values = mapData.data.map((d) => d.value)

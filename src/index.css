@@ -508,6 +508,11 @@ select {
   background: #e2e2e2;
 }
 
+.legend-swatch-more {
+  background: transparent;
+  border: 1px dashed var(--border);
+}
+
 /* Map interaction */
 
 .map-canvas {

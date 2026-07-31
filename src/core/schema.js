@@ -6,7 +6,10 @@ const iso3Pattern = /^[A-Z]{3}$/
 export const mapDataSchema = z.object({
   title: z.string().min(1).max(200),
   unit: z.string().min(1).max(60),
-  scale: z.enum(['sequential', 'diverging']),
+  // "categorical" is for word/label answers (e.g. "what does each country
+  // call X") rather than a numeric measurement — countries sharing the same
+  // value are colored the same instead of being placed on a color ramp.
+  scale: z.enum(['sequential', 'diverging', 'categorical']),
   // What the index measures and how it was reasoned about in general — always
   // required, independent of the per-country `reasoning` field below (which is
   // optional and only populated when the user opts into the pricier
@@ -16,7 +19,9 @@ export const mapDataSchema = z.object({
     .array(
       z.object({
         iso3: z.string().regex(iso3Pattern, 'must be an ISO 3166-1 alpha-3 code, e.g. "USA"'),
-        value: z.number().finite(),
+        // A number for sequential/diverging maps, or a short label string for
+        // categorical ones.
+        value: z.union([z.number().finite(), z.string().min(1).max(100)]),
         // Nullish (not just optional): providers using strict JSON-schema
         // structured outputs (e.g. OpenAI) require every property to be
         // present and represent "omitted" as an explicit null.

@@ -12,7 +12,7 @@ const MAP_DATA_JSON_SCHEMA = {
   properties: {
     title: { type: 'string' },
     unit: { type: 'string' },
-    scale: { type: 'string', enum: ['sequential', 'diverging'] },
+    scale: { type: 'string', enum: ['sequential', 'diverging', 'categorical'] },
     explanation: { type: 'string' },
     data: {
       type: 'array',
@@ -20,7 +20,7 @@ const MAP_DATA_JSON_SCHEMA = {
         type: 'object',
         properties: {
           iso3: { type: 'string', pattern: '^[A-Z]{3}$' },
-          value: { type: 'number' },
+          value: { type: ['number', 'string'] },
           reasoning: { type: ['string', 'null'] },
         },
         required: ['iso3', 'value', 'reasoning'],

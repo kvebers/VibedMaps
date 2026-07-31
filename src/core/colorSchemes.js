@@ -8,6 +8,8 @@ import {
   interpolatePiYG,
   interpolateBrBG,
   interpolatePuOr,
+  schemeTableau10,
+  schemeSet2,
 } from 'd3-scale-chromatic'
 
 // `colorblindSafe` follows ColorBrewer's classification (colorbrewer2.org)
@@ -33,15 +35,36 @@ export const DIVERGING_SCHEMES = [
   { id: 'puor', label: 'Purple-Orange', interpolator: interpolatePuOr, colorblindSafe: true },
 ]
 
+// Categorical (word/label) maps use a fixed palette of distinct colors keyed
+// by array index rather than an interpolator over a numeric domain — see
+// getCategoricalColors below.
+/** @type {Array<{ id: string, label: string, colors: readonly string[], colorblindSafe: boolean }>} */
+export const CATEGORICAL_SCHEMES = [
+  { id: 'tableau10', label: 'Tableau 10', colors: schemeTableau10, colorblindSafe: false },
+  { id: 'set2', label: 'Set 2', colors: schemeSet2, colorblindSafe: true },
+]
+
 const DEFAULT_SEQUENTIAL = SEQUENTIAL_SCHEMES[0].id
 const DEFAULT_DIVERGING = DIVERGING_SCHEMES[0].id
+const DEFAULT_CATEGORICAL = CATEGORICAL_SCHEMES[0].id
 
 /**
- * @param {'sequential' | 'diverging'} scaleType
- * @returns {Array<{ id: string, label: string, interpolator: (t: number) => string, colorblindSafe: boolean }>}
+ * @param {'sequential' | 'diverging' | 'categorical'} scaleType
+ * @returns {Array<{ id: string, label: string, colorblindSafe: boolean }>}
  */
 export function schemesFor(scaleType) {
+  if (scaleType === 'categorical') return CATEGORICAL_SCHEMES
   return scaleType === 'diverging' ? DIVERGING_SCHEMES : SEQUENTIAL_SCHEMES
+}
+
+/**
+ * Resolves a scheme id to its discrete color list, for categorical maps.
+ * @param {string} [schemeId]
+ * @returns {readonly string[]}
+ */
+export function getCategoricalColors(schemeId) {
+  const found = CATEGORICAL_SCHEMES.find((s) => s.id === schemeId) || CATEGORICAL_SCHEMES.find((s) => s.id === DEFAULT_CATEGORICAL)
+  return found.colors
 }
 
 /**

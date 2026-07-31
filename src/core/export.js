@@ -19,6 +19,7 @@ const LEGEND_LABEL_SIZE = 10
 const LINE_GAP = 1.4
 
 function formatLegendValue(v) {
+  if (typeof v !== 'number') return String(v)
   if (Math.abs(v) >= 1000) return v.toFixed(0)
   if (Math.abs(v) >= 10) return v.toFixed(1)
   return v.toFixed(2)
@@ -158,7 +159,16 @@ export function buildExportSvg(svgEl, mapData, options = {}) {
   // Legend
   if (legendStops.length) {
     const ly = headerHeight + mapHeight + PADDING * 0.75
-    if (binned) {
+    if (mapData?.scale === 'categorical') {
+      let lx = PADDING
+      const font = `${LEGEND_LABEL_SIZE}px sans-serif`
+      for (const stop of legendStops) {
+        if (stop.color) svg.appendChild(rectEl(lx, ly, 12, 12, stop.color))
+        const label = String(stop.value)
+        svg.appendChild(textEl(lx + (stop.color ? 16 : 0), ly + 10, label, { size: LEGEND_LABEL_SIZE, fill: MUTED_COLOR }))
+        lx += (stop.color ? 16 : 0) + measureText(mctx, label, font) + 16
+      }
+    } else if (binned) {
       let lx = PADDING
       const font = `${LEGEND_LABEL_SIZE}px sans-serif`
       for (const stop of legendStops) {

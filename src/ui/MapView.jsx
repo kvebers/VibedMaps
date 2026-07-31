@@ -2,16 +2,51 @@ import { useEffect, useRef, useState } from 'react'
 import { select } from 'd3-selection'
 import { zoom } from 'd3-zoom'
 import worldTopology from 'world-atlas/countries-110m.json'
-import { renderMap, getLegendStops } from '../core/render.js'
+import { renderMap, getLegendStops, labelFits } from '../core/render.js'
 import { RankedList, DataTable } from './CompanionView.jsx'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
+/**
+ * Re-evaluates which value labels fit at the current zoom scale `k`, and
+ * counter-scales each visible one so it stays a constant, readable size
+ * instead of growing/shrinking along with the zoomed map underneath it.
+ * Labels are tagged with their pre-zoom box size (data-box-w/-h) at render
+ * time — at k=1 that's the country's actual on-screen size, but as k grows
+ * a country that was too small to label initially can cross the fit
+ * threshold, so this needs to re-run on every zoom tick, not just at render.
+ */
+function updateValueLabels(root, k) {
+  if (!root) return
+  for (const el of root.querySelectorAll('.value-label')) {
+    const boxW = Number(el.dataset.boxW) * k
+    const boxH = Number(el.dataset.boxH) * k
+    el.style.display = labelFits(el.textContent, boxW, boxH) ? '' : 'none'
+    const x = el.getAttribute('x')
+    const y = el.getAttribute('y')
+    el.setAttribute('transform', `translate(${x} ${y}) scale(${1 / k}) translate(${-x} ${-y})`)
+  }
+}
+
 function Legend({ mapData, schemeId, binned }) {
+  const categorical = mapData.scale === 'categorical'
   const stops = getLegendStops(mapData, { schemeId, binned, bins: 6, steps: 6 })
   return (
     <div className="legend">
-      {binned ? (
+      {categorical ? (
+        <div className="legend-bins">
+          {stops.map((s, i) => (
+            <div key={i} className="legend-bin">
+              {s.color ? (
+                <span className="legend-swatch" style={{ background: s.color }} />
+              ) : (
+                <span className="legend-swatch legend-swatch-more" />
+              )}
+              <span className="legend-bin-label">{s.value}</span>
+            </div>
+          ))}
+        </div>
+      ) : binned ? (
         <div className="legend-bins">
           {stops.map((s, i) => (
             <div key={i} className="legend-bin">
@@ -55,8 +90,6 @@ export function MapView({
   schemeId,
   binned,
   displayMode,
-  pinnedIso3,
-  onTogglePin,
   companionView,
 }) {
   const containerRef = useRef(null)
@@ -90,6 +123,7 @@ export function MapView({
         lastTransformRef.current = event.transform
         if (zoomLayerElRef.current) {
           zoomLayerElRef.current.setAttribute('transform', String(event.transform))
+          updateValueLabels(zoomLayerElRef.current, event.transform.k)
         }
       })
     svgSelection.call(zoomBehavior)
@@ -136,22 +170,17 @@ export function MapView({
     svgRef.current.appendChild(wrapper)
     zoomLayerElRef.current = wrapper
     if (lastTransformRef.current) wrapper.setAttribute('transform', String(lastTransformRef.current))
+    updateValueLabels(wrapper, lastTransformRef.current?.k ?? 1)
 
     for (const hit of rendered.hitAreas) {
-      if (pinnedIso3?.has(hit.iso3)) {
-        hit.element.setAttribute('stroke', '#111827')
-        hit.element.setAttribute('stroke-width', '2')
-      }
-      hit.element.style.cursor = 'pointer'
       hit.element.addEventListener('mouseenter', (e) => showTooltip(e, hit))
       hit.element.addEventListener('mousemove', (e) => showTooltip(e, hit))
       hit.element.addEventListener('mouseleave', hideTooltip)
-      hit.element.addEventListener('click', () => onTogglePin?.(hit.iso3))
     }
 
     setHitAreas(rendered.hitAreas)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapData, size, svgRef, regionId, showValues, schemeId, binned, displayMode, pinnedIso3])
+  }, [mapData, size, svgRef, regionId, showValues, schemeId, binned, displayMode])
 
   return (
     <div className="map-view">

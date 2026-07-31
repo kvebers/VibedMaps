@@ -62,6 +62,9 @@ export default function App() {
   const [divergingSchemeId, setDivergingSchemeId] = useState(
     (initialShared?.mapData?.scale === 'diverging' && initialShared?.schemeId) || 'rdbu',
   )
+  const [categoricalSchemeId, setCategoricalSchemeId] = useState(
+    (initialShared?.mapData?.scale === 'categorical' && initialShared?.schemeId) || 'tableau10',
+  )
   const [binned, setBinned] = useState(initialShared?.binned ?? false)
   const [mode, setMode] = useState('quick')
   const [includeReasoning, setIncludeReasoning] = useState(false)
@@ -72,7 +75,6 @@ export default function App() {
   const [progress, setProgress] = useState(null)
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState(null)
-  const [pinnedIso3, setPinnedIso3] = useState(() => new Set())
   const [history, setHistory] = useState(loadHistory)
   const [compareMapData, setCompareMapData] = useState(null)
   const [compareLabel, setCompareLabel] = useState(null)
@@ -102,7 +104,6 @@ export default function App() {
   }
 
   function resetForNewMap() {
-    setPinnedIso3(new Set())
     setCompareMapData(null)
     setCompareLabel(null)
     setShowDiff(false)
@@ -184,21 +185,16 @@ export default function App() {
       return
     }
     if (!mapData || !compareMapData) return
+    if (mapData.scale === 'categorical' || compareMapData.scale === 'categorical') {
+      setError('Diff is only available for numeric maps — one of these two is a word/category map.')
+      return
+    }
     const diff = computeDiff(mapData, compareMapData)
     if (diff.data.length === 0) {
       setError('No countries overlap between the current map and the comparison file.')
       return
     }
     setShowDiff(true)
-  }
-
-  function handleTogglePin(iso3) {
-    setPinnedIso3((prev) => {
-      const next = new Set(prev)
-      if (next.has(iso3)) next.delete(iso3)
-      else next.add(iso3)
-      return next
-    })
   }
 
   async function handleCopyShareLink() {
@@ -220,9 +216,10 @@ export default function App() {
   }
 
   const scaleType = mapData?.scale || 'sequential'
-  const schemeId = scaleType === 'diverging' ? divergingSchemeId : sequentialSchemeId
+  const schemeId =
+    scaleType === 'diverging' ? divergingSchemeId : scaleType === 'categorical' ? categoricalSchemeId : sequentialSchemeId
   const handleSchemeChange =
-    scaleType === 'diverging' ? setDivergingSchemeId : setSequentialSchemeId
+    scaleType === 'diverging' ? setDivergingSchemeId : scaleType === 'categorical' ? setCategoricalSchemeId : setSequentialSchemeId
 
   const displayedMapData = showDiff && compareMapData ? computeDiff(mapData, compareMapData) : mapData
 
@@ -263,8 +260,6 @@ export default function App() {
         schemeId={schemeId}
         binned={binned}
         displayMode={displayMode}
-        pinnedIso3={pinnedIso3}
-        onTogglePin={handleTogglePin}
         companionView={companionView}
       />
 
