@@ -12,6 +12,12 @@ Rules:
 - "scale" must be "diverging" if the value has a meaningful zero/neutral midpoint (e.g. net change, \
 balance, temperature anomaly), otherwise "sequential" (e.g. consumption per capita, population, price).
 - "unit" is a short label for the legend (e.g. "kg/year", "%", "USD").
+- If the question asks for a real-world measurable quantity (consumption, population, price, temperature, \
+distance, etc.), use realistic values in that quantity's natural unit and range.
+- If instead the question asks for a subjective score, index, rating, or "how much X" with no real-world \
+unit, use a clean, round scale — 0–10 or 0–100 — rather than an arbitrary range like 6–92. Countries don't \
+need to span the full scale (e.g. lowest country can be 15 and highest 88 on a 0–100 scale), but the scale \
+itself should be a round number other people generating similar indices would also land on, not a bespoke range.
 - "title" is a short, human-readable title for the map.
 - "explanation" is REQUIRED on every response: 2-4 sentences explaining what this index measures and, \
 in general terms, how you reasoned about assigning values (what factors you weighted, what kind of \

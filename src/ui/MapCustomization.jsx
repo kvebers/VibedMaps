@@ -170,13 +170,19 @@ export function MapCustomization({
 
         {history && history.length > 0 && (
           <label className="field field-inline" title="History">
-            <select defaultValue="" onChange={(e) => e.target.value && onLoadHistory(e.target.value)}>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) onLoadHistory(e.target.value);
+                e.target.value = "";
+              }}
+            >
               <option value="" disabled>
                 {history.length} saved…
               </option>
               {history.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.title} — {h.timestamp}
+                  {h.title}
                 </option>
               ))}
             </select>
