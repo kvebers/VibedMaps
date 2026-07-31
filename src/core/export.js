@@ -6,9 +6,11 @@ import { parseMapData } from './schema.js'
 import { getLegendStops } from './render.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
+const BRAND_TEXT = 'VibedMaps'
 const AI_CAPTION_TEXT = 'AI-generated, not real data'
-const TEXT_COLOR = '#08060d'
-const MUTED_COLOR = '#6b6375'
+const TEXT_COLOR = '#000000'
+const MUTED_COLOR = '#590202'
+const ACCENT_COLOR = '#bf0404'
 const PADDING = 16
 const TITLE_SIZE = 18
 const UNIT_SIZE = 12
@@ -138,8 +140,17 @@ export function buildExportSvg(svgEl, mapData, options = {}) {
   }
 
   // Map content, moved into a translated group so it sits below the header.
+  // Clipped to its own bounds so a panned/zoomed live map can never bleed
+  // into the header/legend/caption area of the exported image.
+  const clipId = 'export-map-clip'
+  const clipPath = document.createElementNS(SVG_NS, 'clipPath')
+  clipPath.setAttribute('id', clipId)
+  clipPath.appendChild(rectEl(0, 0, mapWidth, mapHeight, 'none'))
+  svg.appendChild(clipPath)
+
   const mapGroup = document.createElementNS(SVG_NS, 'g')
   mapGroup.setAttribute('transform', `translate(0, ${headerHeight})`)
+  mapGroup.setAttribute('clip-path', `url(#${clipId})`)
   const mapClone = svgEl.cloneNode(true)
   while (mapClone.firstChild) mapGroup.appendChild(mapClone.firstChild)
   svg.appendChild(mapGroup)
@@ -176,15 +187,53 @@ export function buildExportSvg(svgEl, mapData, options = {}) {
     }
   }
 
-  // "AI-generated, not real data" caption, bottom-right corner.
-  svg.appendChild(
-    textEl(totalWidth - PADDING * 0.5, totalHeight - PADDING * 0.4, AI_CAPTION_TEXT, {
-      size: 11,
-      italic: true,
-      fill: MUTED_COLOR,
-      anchor: 'end',
-    }),
+  // "VibedMaps · AI-generated, not real data" caption, bottom-right corner.
+  // Given its own backing chip so it stays legible regardless of what's
+  // drawn underneath (e.g. a dark country fill right at the edge of the map).
+  const captionFont = `italic 11px sans-serif`
+  const brandFont = `700 11px sans-serif`
+  const captionSep = '  ·  '
+  const captionWidth =
+    measureText(mctx, BRAND_TEXT, brandFont) + measureText(mctx, captionSep, captionFont) + measureText(mctx, AI_CAPTION_TEXT, captionFont)
+  const captionX = totalWidth - PADDING * 0.5
+  const captionY = totalHeight - PADDING * 0.4
+  const chipPaddingX = 8
+  const chipPaddingY = 5
+  const chip = rectEl(
+    captionX - captionWidth - chipPaddingX,
+    captionY - 11 - chipPaddingY,
+    captionWidth + chipPaddingX * 2,
+    11 + chipPaddingY * 2,
+    'rgba(255, 255, 255, 0.85)',
   )
+  chip.setAttribute('rx', '5')
+  svg.appendChild(chip)
+
+  const captionEl = document.createElementNS(SVG_NS, 'text')
+  captionEl.setAttribute('x', String(captionX))
+  captionEl.setAttribute('y', String(captionY))
+  captionEl.setAttribute('font-family', 'sans-serif')
+  captionEl.setAttribute('text-anchor', 'end')
+
+  const brandTspan = document.createElementNS(SVG_NS, 'tspan')
+  brandTspan.setAttribute('font-size', '11')
+  brandTspan.setAttribute('font-weight', '700')
+  brandTspan.setAttribute('fill', ACCENT_COLOR)
+  brandTspan.textContent = BRAND_TEXT
+
+  const sepTspan = document.createElementNS(SVG_NS, 'tspan')
+  sepTspan.setAttribute('font-size', '11')
+  sepTspan.setAttribute('fill', MUTED_COLOR)
+  sepTspan.textContent = captionSep
+
+  const aiTspan = document.createElementNS(SVG_NS, 'tspan')
+  aiTspan.setAttribute('font-size', '11')
+  aiTspan.setAttribute('font-style', 'italic')
+  aiTspan.setAttribute('fill', MUTED_COLOR)
+  aiTspan.textContent = AI_CAPTION_TEXT
+
+  captionEl.append(brandTspan, sepTspan, aiTspan)
+  svg.appendChild(captionEl)
 
   return svg
 }
