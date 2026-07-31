@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Controls } from './Controls.jsx'
+import { GenerationOptions } from './GenerationOptions.jsx'
+import { MapCustomization } from './MapCustomization.jsx'
 import { MapView } from './MapView.jsx'
 import { generateMapData } from '../core/generate.js'
 import { exportSvg, exportPng, exportJson, importJsonFile } from '../core/export.js'
@@ -82,6 +83,7 @@ export default function App() {
     const t = setTimeout(() => setNotice(null), 2500)
     return () => clearTimeout(t)
   }, [notice])
+
 
   function handleProviderChange(nextProviderId) {
     setProviderId(nextProviderId)
@@ -226,22 +228,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="app-header">
-        <h1>VibedMaps</h1>
-        <p className="app-tagline">Ask a question. Get a colored world map. No backend, no accuracy guarantees pure vibes.</p>
-      </header>
-
-      <Controls
-        question={question}
-        onQuestionChange={setQuestion}
-        providerId={providerId}
-        onProviderChange={handleProviderChange}
-        apiKey={apiKey}
-        onApiKeyChange={handleApiKeyChange}
-        model={model}
-        onModelChange={setModel}
-        regionId={regionId}
-        onRegionChange={setRegionId}
+      <MapCustomization
         showValues={showValues}
         onShowValuesChange={setShowValues}
         scaleType={scaleType}
@@ -249,17 +236,10 @@ export default function App() {
         onSchemeChange={handleSchemeChange}
         binned={binned}
         onBinnedChange={setBinned}
-        mode={mode}
-        onModeChange={setMode}
-        includeReasoning={includeReasoning}
-        onIncludeReasoningChange={setIncludeReasoning}
         displayMode={displayMode}
         onDisplayModeChange={setDisplayMode}
         companionView={companionView}
         onCompanionViewChange={setCompanionView}
-        onGenerate={handleGenerate}
-        loading={loading}
-        progress={progress}
         canExport={Boolean(mapData)}
         onExportSvg={handleExportSvg}
         onExportPng={handleExportPng}
@@ -275,9 +255,6 @@ export default function App() {
         onToggleDiff={handleToggleDiff}
       />
 
-      {error && <div className="error-banner">{error}</div>}
-      {notice && <div className="notice-banner">{notice}</div>}
-
       <MapView
         mapData={displayedMapData}
         svgRef={svgRef}
@@ -289,6 +266,29 @@ export default function App() {
         pinnedIso3={pinnedIso3}
         onTogglePin={handleTogglePin}
         companionView={companionView}
+      />
+
+      {error && <div className="error-banner">{error}</div>}
+      {notice && <div className="notice-banner">{notice}</div>}
+
+      <GenerationOptions
+        question={question}
+        onQuestionChange={setQuestion}
+        providerId={providerId}
+        onProviderChange={handleProviderChange}
+        apiKey={apiKey}
+        onApiKeyChange={handleApiKeyChange}
+        model={model}
+        onModelChange={setModel}
+        regionId={regionId}
+        onRegionChange={setRegionId}
+        mode={mode}
+        onModeChange={setMode}
+        includeReasoning={includeReasoning}
+        onIncludeReasoningChange={setIncludeReasoning}
+        onGenerate={handleGenerate}
+        loading={loading}
+        progress={progress}
       />
     </div>
   )

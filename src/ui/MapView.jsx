@@ -24,21 +24,19 @@ function Legend({ mapData, schemeId, binned }) {
         </div>
       ) : (
         <>
+          <span>{formatValue(stops[0].value)}</span>
           <div className="legend-ramp">
             {stops.map((s, i) => (
               <div key={i} className="legend-swatch" style={{ background: s.color }} />
             ))}
           </div>
-          <div className="legend-labels">
-            <span>{formatValue(stops[0].value)}</span>
-            <span>{formatValue(stops[stops.length - 1].value)}</span>
-          </div>
+          <span>{formatValue(stops[stops.length - 1].value)}</span>
         </>
       )}
-      <div className="legend-swatch-row">
+      <span className="legend-swatch-row">
         <span className="legend-swatch legend-swatch-nodata" />
         <span>no data</span>
-      </div>
+      </span>
     </div>
   )
 }
@@ -66,7 +64,7 @@ export function MapView({
   const zoomLayerElRef = useRef(null)
   const zoomBehaviorRef = useRef(null)
   const lastTransformRef = useRef(null)
-  const [size, setSize] = useState({ width: 800, height: 460 })
+  const [size, setSize] = useState({ width: 800, height: 400 })
   const [tooltip, setTooltip] = useState(null)
   const [hitAreas, setHitAreas] = useState([])
 
@@ -75,7 +73,7 @@ export function MapView({
     if (!el) return
     const observer = new ResizeObserver((entries) => {
       const width = entries[0].contentRect.width
-      setSize({ width, height: Math.max(320, width * 0.55) })
+      setSize({ width, height: Math.max(300, width * 0.5) })
     })
     observer.observe(el)
     return () => observer.disconnect()
