@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { select } from 'd3-selection'
 import { zoom } from 'd3-zoom'
-import worldTopology from 'world-atlas/countries-110m.json'
+import worldTopology from '../assets/countries-110m.json'
 import { renderMap, getLegendStops, labelFits } from '../core/render.js'
 import { RankedList, DataTable } from './CompanionView.jsx'
 
